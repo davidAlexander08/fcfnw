@@ -27,7 +27,7 @@ parametros_variacao_volume_util_mlt = {
     "V3":[            60          ,   80            ],
     "V4":[            80          ,   80            ],
 }
-caminho_caso = "../"
+caminho_caso = r"C:\Users\david.alexander\Documents\TEMPORARIO\FERRAMENTA_FCF"
 
 ### CONFIGURA LOG
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -65,14 +65,14 @@ else:
 
 
 ### LEITURA NWLISTCF.REL
-caminho_nwlistcf = os.path.join("nwlistcf.csv")
+caminho_nwlistcf = os.path.join(caminho_caso, "nwlistcf","nwlistcf.rel")
 if not os.path.exists(caminho_nwlistcf):
     raise FileNotFoundError(f"Arquivo não encontrado: {caminho_nwlistcf}. A pasta informada pode não ser um caso de NEWAVE.")
 else:
     logging.info(f"Lendo arquivo nwlistcf.rel")
-    #df = Nwlistcfrel.read(caminho_nwlistcf).cortes
+    df = Nwlistcfrel.read(caminho_nwlistcf).cortes
     #df.head(1000).to_csv("nwlistcf.csv",index = False)
-    df = pd.read_csv("nwlistcf_testes.csv")
+    #df = pd.read_csv(caminho_nwlistcf)
     print(df)
     periodo = df["PERIODO"].unique()[0]
     periodo_real = mes_inicio - periodo
@@ -87,10 +87,10 @@ else:
 
 
 ### LEITURA PARPVAZ
-caminho_mlt_incremental = os.path.join("mlt_incremental.csv")
+caminho_mlt_incremental = os.path.join(caminho_caso,"mlt_incremental.csv")
 if os.path.exists(caminho_mlt_incremental):
         logging.info(f"Lendo arquivo de MLT Incremental")
-        mlt_incremental = pd.read_csv(caminho_caso+"/mlt_incremental.csv") 
+        df_mlt_incremental = pd.read_csv(caminho_mlt_incremental) 
 else:
     caminho_parpvaz = os.path.join(caminho_caso, "parpvaz.dat")
     if not os.path.exists(caminho_parpvaz):
@@ -110,15 +110,15 @@ else:
                 lista_df.append(
                     pd.DataFrame(
                         {
-                            "codigo_usina":usi,
-                            "nome_usina":nome_usina,
-                            "mes":mes,
-                            "MLT_INCR":MLT_INCREMENTAL
+                            "codigo_usina":[usi],
+                            "nome_usina":[nome_usina],
+                            "mes":[mes],
+                            "valor":[MLT_INCREMENTAL]
                         }
                     )
                 )
         df_mlt_incremental = pd.concat(lista_df).reset_index(drop = True)
-        df_mlt_incremental.to_csv(caminho_caso+"/mlt_incremental.csv", index = False)
+        df_mlt_incremental.to_csv(caminho_mlt_incremental, index = False)
 
 end = time.time()
 logging.info(f"Tempo de leitura dos dados de entrada: {end - start:.4f} segundos")
@@ -179,8 +179,8 @@ for parametro in parametros_variacao_volume_util_mlt:
         lista_df_contribuicao_volume.append(df_memoria_calculo_rhs)
 
         ## VERIFICA QUAL A MLT DO MÊS EM QUESTÃO, CONVERTE PARA HM3 e TIRA QUAL SERÁ O PERCENTUAL DA MLT
-        serie_vazoes_usina = series_vazoes_incrementais.loc[(series_vazoes_incrementais["uhe"] == nome_usina)].reset_index(drop = True)
-        primeiras_ocorrencias_por_data = serie_vazoes_usina.drop_duplicates(subset='data', keep='first').reset_index(drop = True)
+        #serie_vazoes_usina = series_vazoes_incrementais.loc[(series_vazoes_incrementais["uhe"] == nome_usina)].reset_index(drop = True)
+        #primeiras_ocorrencias_por_data = serie_vazoes_usina.drop_duplicates(subset='data', keep='first').reset_index(drop = True)
 
         contador_lags = 1
         for coluna_lag in piafl_cols:
@@ -188,7 +188,7 @@ for parametro in parametros_variacao_volume_util_mlt:
             if(mes_lag <= 0):
                 mes_lag = mes_real - contador_lags + 12
             #print("mes_real: ", mes_real, " mes_lag: ", mes_lag)
-            periodo_mes_ocorrencia = primeiras_ocorrencias_por_data.loc[(primeiras_ocorrencias_por_data["data"].dt.month == mes_lag)].reset_index(drop = True)
+            periodo_mes_ocorrencia = df_mlt_incremental.loc[(df_mlt_incremental["mes"] == mes_lag)].reset_index(drop = True)
             MLT = periodo_mes_ocorrencia["valor"].mean()
             PERC_MLT = (MLT*2.63)*(valores_percentuais[1]/100)
             parcela_afluencia_abatimento_rhs = df_ireg_usi[coluna_lag]*PERC_MLT
@@ -228,43 +228,67 @@ for parametro in parametros_variacao_volume_util_mlt:
     logging.info(f"Gerando gráfico do par %VU {valores_percentuais[0]} %MLT {valores_percentuais[1]}")
     fig = go.Figure()
     mapa_ireg_linha_y = {}
+    lista_df = []
     for ireg in lista_ireg:
         df_ireg = df_ireg_rhs.loc[(df_ireg_rhs["IREG"] == ireg)].reset_index(drop = True)
         coef_usi = df.loc[(df["IREG"] == ireg) & (df["UHE"] == usina_escolhida)]["PIVARM"].iloc[0]    
         mapa_ireg_linha_y[ireg] = coef_usi*x + df_ireg["RHS_CALC"].iloc[0]
-    keys = list(mapa_ireg_linha_y.keys())
-    lists = list(mapa_ireg_linha_y.values())
-    # PEGA QUAIS SAO OS CORTES COM MAIOR VALOR PARA CADA PONTO E QUAL O CORTE ATIVO RESPECTIVO
-    max_values = []
-    source_keys = []
-    for items in zip(*lists):
-        max_val = max(items)
-        max_index = items.index(max_val)
-        source_key = keys[max_index]
-        max_values.append(max_val)
-        source_keys.append(source_key)
+        df_result = pd.DataFrame({"Y": mapa_ireg_linha_y[ireg]})
+        df_result["RHS"] = df_ireg["RHS_CALC"].iloc[0]
+        df_result["IREG"] = ireg
+        df_result["PIV"] = coef_usi
+        df_result["X"] = x
+        df_result["Perc_X"] = x/max(x)
+        lista_df.append(df_result)
 
-    titulo_csv = f"cortes_ativos_{nome_usina_escolhida}_%VU_{valores_percentuais[0]}_%MLT_{valores_percentuais[1]}"
-    #IMRPIME OS CORTES ATIVOS
+    df_final = pd.concat(lista_df).reset_index(drop = True)
+    
+    lista_y = []
+    lista_PIV = []
+    lista_df = []
+    for val_x in x:
+        df_y = df_final.loc[(df_final["X"] == val_x)].reset_index(drop =True)
+        val_y = df_y["Y"].max()
+        piv_y =  df_y.loc[(df_y["Y"] == val_y)]["PIV"].iloc[0]
+        lista_y.append(val_y)
+        lista_PIV.append(piv_y)        
+        lista_df.append(
+            pd.DataFrame(
+        {
+            "Y":[val_y],
+            "X":[val_x],
+            "USINA":[nome_usina],
+            "PIV":[piv_y],              
+        }
+        )
+        )
+    df_cortes_ativos = pd.concat(lista_df).reset_index(drop = True)
+
+    titulo_csv = f"{caminho_caso}/cortes_ativos_{nome_usina_escolhida}_%VU_{valores_percentuais[0]}_%MLT_{valores_percentuais[1]}.csv"
     logging.info(f"Imprimindo cortes ativos")
-    with open(f"{titulo_csv}.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["source_key", "max_value", "vUtil"])  # header
-        for key, value, vutil in zip(source_keys, max_values, x):
-            writer.writerow([key, value, vutil])
+    df_cortes_ativos.to_csv(titulo_csv, index = False)
 
     ## PLOTA OS CORTES ATIVOS
-    fig.add_trace(go.Scatter(x=x, y=max_values, showlegend=False, mode='lines', line=dict(color='red'), name=f'Cortes Ativos'))
-
-    titulo = f"Cortes Ativos Usina {nome_usina_escolhida} %VU {valores_percentuais[0]} %MLT {valores_percentuais[1]}"
+    fig.add_trace(go.Scatter(x=df_final["Perc_X"].unique(), y=lista_PIV, showlegend=False, mode='lines', line=dict(color='red'), name=f'Cortes'))
+    titulo = f"Cortes Ativos da Usina {nome_usina_escolhida} com %VU {valores_percentuais[0]} %MLT {valores_percentuais[1]}"
     fig.update_layout(
         title=titulo,
-        xaxis_title="hm3",
+        xaxis_title="(%) Volume Util",
         yaxis_title="$",
         showlegend=True
     )
+    fig.write_html(f"{caminho_caso}/{titulo}.html", include_plotlyjs='cdn') 
 
-    fig.write_html(f"{titulo}.html", include_plotlyjs='cdn') 
+
+    fig.add_trace(go.Scatter(x=df_final["Perc_X"].unique(), y=lista_PIV, showlegend=False, mode='lines', line=dict(color='red'), name=f'PIVs'))
+    titulo = f"PIVs dos Cortes Ativos da Usina {nome_usina_escolhida} com %VU {valores_percentuais[0]} %MLT {valores_percentuais[1]}"
+    fig.update_layout(
+        title=titulo,
+        xaxis_title="(%) Volume Util",
+        yaxis_title="(R$/hm3) PIV",
+        showlegend=True
+    )
+    fig.write_html(f"{caminho_caso}/{titulo}.html", include_plotlyjs='cdn') 
 
     end_etapa = time.time()
     logging.info(f"Gerou o gráfico {titulo} em {end_etapa - start_etapa:.4f} segundos")
