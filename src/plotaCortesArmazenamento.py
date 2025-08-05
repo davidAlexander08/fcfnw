@@ -27,7 +27,15 @@ parametros_variacao_volume_util_mlt = {
     "V3":[            60          ,   80            ],
     "V4":[            80          ,   80            ],
 }
-caminho_caso = r"C:\Users\david.alexander\Documents\TEMPORARIO\FERRAMENTA_FCF"
+#caminho_caso = r"C:\Users\david.alexander\Documents\TEMPORARIO\FERRAMENTA_FCF"
+#caminho_caso = "\\home\\pem\\estudos\\estudo_UHE_Canastra\\Sensibilidade_Semente\\comCANASTRA_sem2\\"
+caminho_caso = "/home/pem/estudos/estudo_UHE_Canastra/Sensibilidade_Semente/comCANASTRA_sem2/"
+arquivo_saida = "saida_fcfnw"
+caminho_arquivo_saida = os.path.join(caminho_caso, arquivo_saida)
+os.makedirs(caminho_arquivo_saida, exist_ok=True)
+
+
+
 
 ### CONFIGURA LOG
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -82,7 +90,7 @@ else:
     usinas = df["UHE"].unique()
     
     eco_primeiro_rhs = df.loc[(df["IREG"] == lista_ireg[0])].reset_index(drop = True)
-    eco_primeiro_rhs.to_csv("eco_primeiro_rhs.csv")
+    eco_primeiro_rhs.to_csv(caminho_arquivo_saida + "/" +"eco_primeiro_rhs.csv")
 
 
 
@@ -219,10 +227,10 @@ for parametro in parametros_variacao_volume_util_mlt:
     #print(df_ireg_rhs)
     
     df_resultante_memoria_calculo_vol = pd.concat(lista_df_contribuicao_volume).reset_index(drop = True)
-    df_resultante_memoria_calculo_vol.to_csv(f"memoria_de_calculo_RHS_VOL_{1}.csv", index  = False)
+    df_resultante_memoria_calculo_vol.to_csv(caminho_arquivo_saida + "/" +f"memoria_de_calculo_RHS_VOL_{1}.csv", index  = False)
 
     df_resultante_memoria_calculo_afl = pd.concat(lista_df_contribuicao_afluencia).reset_index(drop = True)
-    df_resultante_memoria_calculo_afl.to_csv(f"memoria_de_calculo_RHS_AFL_{1}.csv", index  = False)
+    df_resultante_memoria_calculo_afl.to_csv(caminho_arquivo_saida + "/" +f"memoria_de_calculo_RHS_AFL_{1}.csv", index  = False)
 
 
     logging.info(f"Gerando gráfico do par %VU {valores_percentuais[0]} %MLT {valores_percentuais[1]}")
@@ -264,7 +272,7 @@ for parametro in parametros_variacao_volume_util_mlt:
         )
     df_cortes_ativos = pd.concat(lista_df).reset_index(drop = True)
 
-    titulo_csv = f"{caminho_caso}/cortes_ativos_{nome_usina_escolhida}_%VU_{valores_percentuais[0]}_%MLT_{valores_percentuais[1]}.csv"
+    titulo_csv = f"{caminho_arquivo_saida}/cortes_ativos_{nome_usina_escolhida}_%VU_{valores_percentuais[0]}_%MLT_{valores_percentuais[1]}.csv"
     logging.info(f"Imprimindo cortes ativos")
     df_cortes_ativos.to_csv(titulo_csv, index = False)
 
@@ -277,7 +285,7 @@ for parametro in parametros_variacao_volume_util_mlt:
         yaxis_title="$",
         showlegend=True
     )
-    fig.write_html(f"{caminho_caso}/{titulo}.html", include_plotlyjs='cdn') 
+    fig.write_html(caminho_arquivo_saida + "/" +f"{titulo}.html", include_plotlyjs='cdn') 
 
 
     fig.add_trace(go.Scatter(x=df_final["Perc_X"].unique(), y=lista_PIV, showlegend=False, mode='lines', line=dict(color='red'), name=f'PIVs'))
@@ -288,7 +296,7 @@ for parametro in parametros_variacao_volume_util_mlt:
         yaxis_title="(R$/hm3) PIV",
         showlegend=True
     )
-    fig.write_html(f"{caminho_caso}/{titulo}.html", include_plotlyjs='cdn') 
+    fig.write_html(caminho_arquivo_saida + "/" +f"{titulo}.html", include_plotlyjs='cdn') 
 
     end_etapa = time.time()
     logging.info(f"Gerou o gráfico {titulo} em {end_etapa - start_etapa:.4f} segundos")
